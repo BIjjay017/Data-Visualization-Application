@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+:root[data-theme='light'] {
+    /* Primary Colors */
+    --bg-primary: #FAF8F3;
+    --bg-surface: #FFFFFF;
+    --bg-secondary: #F5F1E8;
+
+    /* Text Colors */
+    --text-primary: #3E2723;
+    --text-secondary: #6D4C41;
+    --text-tertiary: #8D6E63;
+
+    /* Accent Colors */
+    --accent: #A1887F;
+    --accent-hover: #8D6E63;
+    --border: #E0D5C7;
+
+    /* Status Colors */
+    --success: #7CB342;
+    --warning: #F57C00;
+    --error: #D84315;
+    --info: #5C6BC0;
+
+    /* Chart Colors */
+    --chart-1: #A1887F;
+    --chart-2: #BCAAA4;
+    --chart-3: #8D6E63;
+    --chart-4: #D7CCC8;
+    --chart-5: #6D4C41;
+    --chart-6: #EFEBE9;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(62, 39, 35, 0.05);
+    --shadow-md: 0 4px 6px rgba(62, 39, 35, 0.07);
+    --shadow-lg: 0 10px 15px rgba(62, 39, 35, 0.1);
+}
+
+:root[data-theme='dark'] {
+    /* Primary Colors */
+    --bg-primary: #1C1410;
+    --bg-surface: #2C2018;
+    --bg-secondary: #3A2D20;
+
+    /* Text Colors */
+    --text-primary: #F5F1E8;
+    --text-secondary: #D7CCC8;
+    --text-tertiary: #BCAAA4;
+
+    /* Accent Colors */
+    --accent: #A1887F;
+    --accent-hover: #BCAAA4;
+    --border: #4A3A2A;
+
+    /* Status Colors */
+    --success: #9CCC65;
+    --warning: #FFB74D;
+    --error: #FF7043;
+    --info: #7986CB;
+
+    /* Chart Colors */
+    --chart-1: #BCAAA4;
+    --chart-2: #A1887F;
+    --chart-3: #D7CCC8;
+    --chart-4: #8D6E63;
+    --chart-5: #EFEBE9;
+    --chart-6: #6D4C41;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+button {
+    font-family: inherit;
+}
+
+/* Smooth transitions for theme changes */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}

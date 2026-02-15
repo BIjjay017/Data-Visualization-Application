@@ -1,0 +1,354 @@
+.uploadContainer {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+.uploadBox {
+    background: var(--bg-surface);
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.uploadBox:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+.uploadBox.dragging {
+    border-color: var(--accent);
+    background: var(--bg-secondary);
+    border-width: 3px;
+    transform: scale(1.02);
+}
+
+.uploadContent {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.iconWrapper {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border-radius: 50%;
+    margin-bottom: 0.5rem;
+}
+
+.uploadIcon {
+    width: 48px;
+    height: 48px;
+    color: var(--accent);
+}
+
+.uploadTitle {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin: 0;
+    font-weight: 700;
+}
+
+.uploadSubtext {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.supportedFormats {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.formatLabel {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.formatBadges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.formatBadge {
+    padding: 0.4rem 0.8rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.formatBadge:hover {
+    background: var(--accent);
+    color: var(--bg-surface);
+    border-color: var(--accent);
+}
+
+.fileInput {
+    display: none;
+}
+
+.browseButton {
+    padding: 0.8rem 2rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.browseButton:hover {
+    background: var(--accent);
+    color: var(--bg-surface);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.fileInfo {
+    width: 100%;
+    max-width: 500px;
+    overflow: hidden;
+}
+
+.fileDetails {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.fileIcon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.fileText {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    text-align: left;
+    overflow: hidden;
+}
+
+.fileName {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fileSize {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
+.removeButton {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.removeButton:hover {
+    background: var(--error);
+    color: var(--bg-surface);
+    border-color: var(--error);
+    transform: scale(1.1);
+}
+
+.uploadButton {
+    padding: 0.9rem 2.5rem;
+    background: var(--accent);
+    color: var(--bg-surface);
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    margin-top: 0.5rem;
+}
+
+.uploadButton:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.uploadButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.error {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(216, 67, 21, 0.1);
+    border-left: 4px solid var(--error);
+    border-radius: 8px;
+    color: var(--error);
+    font-size: 0.9rem;
+    text-align: left;
+    max-width: 500px;
+    width: 100%;
+}
+
+/* Loading Animation */
+.loadingContainer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-surface);
+    border-radius: 16px;
+    z-index: 10;
+}
+
+.loadingVideo {
+    width: 200px;
+    height: 200px;
+    margin-bottom: 1rem;
+}
+
+.loadingText {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .uploadContainer {
+        padding: 1rem 0.5rem;
+    }
+
+    .uploadBox {
+        padding: 2rem 1rem;
+        min-height: 350px;
+    }
+
+    .iconWrapper {
+        width: 60px;
+        height: 60px;
+    }
+
+    .uploadIcon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .uploadTitle {
+        font-size: 1.2rem;
+    }
+
+    .uploadSubtext {
+        font-size: 0.85rem;
+    }
+
+    .supportedFormats {
+        padding: 0.8rem;
+    }
+
+    .formatBadges {
+        gap: 0.4rem;
+    }
+
+    .formatBadge {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.7rem;
+    }
+
+    .loadingVideo {
+        width: 150px;
+        height: 150px;
+    }
+
+    .loadingText {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-height: 700px) {
+    .uploadBox {
+        min-height: 300px;
+        padding: 2rem 1.5rem;
+    }
+
+    .iconWrapper {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 0.3rem;
+    }
+
+    .uploadIcon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .uploadTitle {
+        font-size: 1.3rem;
+    }
+
+    .uploadContent {
+        gap: 1rem;
+    }
+}
