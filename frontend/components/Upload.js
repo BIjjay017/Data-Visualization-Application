@@ -91,7 +91,8 @@ export default function Upload({ onAnalysisComplete }) {
         formData.append('file', file);
 
         try {
-            const response = await axios.post('http://localhost:8000/upload', formData, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await axios.post(`${apiUrl}/upload`, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

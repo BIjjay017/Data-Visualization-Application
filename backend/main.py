@@ -13,9 +13,14 @@ from summary_generator import generate_dataset_summary, generate_chart_interpret
 
 app = FastAPI()
 
+# CORS configuration for production and development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "https://data-visualization-application-1t87.vercel.app",  # Production Vercel
+        "https://*.vercel.app"  # Any Vercel preview deployments
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
