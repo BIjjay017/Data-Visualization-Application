@@ -85,9 +85,9 @@ def get_summary(df):
     
     # Numeric summaries
     for col in df.select_dtypes(include=[np.number]).columns:
-        summary[f"{col}_sum"] = float(df[col].sum())
-        summary[f"{col}_mean"] = float(df[col].mean())
-        summary[f"{col}_max"] = float(df[col].max())
-        summary[f"{col}_min"] = float(df[col].min())
+        summary[f"{col}_sum"] = round(float(df[col].sum()), 4)
+        summary[f"{col}_mean"] = round(float(df[col].mean()), 4)
+        summary[f"{col}_max"] = round(float(df[col].max()), 4)
+        summary[f"{col}_min"] = round(float(df[col].min()), 4)
         
     return summary

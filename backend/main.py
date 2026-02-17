@@ -1,17 +1,21 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import io
 import uvicorn
 from file_parser import parse_file
-from data_cleaner import clean_data as clean_missing_data
-from data_processor import clean_data, detect_columns, get_summary
+from data_cleaner import clean_data
+from data_processor import get_summary, detect_columns
 from chart_recommender import recommend_charts
-from anomaly_detector import detect_anomalies
 from insight_generator import generate_insights
 from summary_generator import generate_dataset_summary, generate_chart_interpretations, generate_conclusion
+from report_generator import generate_pdf_report
 
 app = FastAPI()
+
+# Global storage for latest analysis (simple caching for MVP)
+# In production, use Redis or a proper cache with session IDs
+latest_analysis = {}
 
 # CORS configuration for production and development
 app.add_middleware(
@@ -37,69 +41,110 @@ async def upload_file(file: UploadFile = File(...)):
         if df_original.empty:
             return {"error": "The uploaded file contains no data"}
         
-        # STEP 1: CLEAN MISSING DATA (NEW MODULE)
-        df, cleaning_report = clean_missing_data(df_original)
+        # STEP 1: COMPREHENSIVE DATA CLEANING PIPELINE
+        # returns df_cleaned and a detailed report
+        df, cleaning_report = clean_data(df_original)
         
-        # STEP 2: Basic data cleaning (existing)
-        df = clean_data(df)
+        # Extract metadata from the report
+        metadata = cleaning_report.get("metadata", {})
         
-        # Pre-process numeric/datetime conversions for better detection
-        # Attempt to convert object columns to datetime if they look like it
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                try:
-                    # Try parsing with year first? Auto should handle YYYY-MM-DD
-                    df[col] = pd.to_datetime(df[col])
-                except:
-                    pass
+        # STEP 2: Detect Columns (using metadata from cleaning step for consistency)
+        columns = {
+            "numeric": [],
+            "categorical": [],
+            "datetime": []
+        }
+        
+        column_types = metadata.get("column_types", {})
+        excluded_cols = cleaning_report.get("cleaning_summary", {}).get("columns_excluded", [])
+        
+        # Populate columns dictionary, skipping excluded ones
+        for col, col_type in column_types.items():
+            if col in excluded_cols:
+                continue
+            
+            if col_type == "numeric":
+                columns["numeric"].append(col)
+            elif col_type == "datetime":
+                columns["datetime"].append(col)
+            else: 
+                columns["categorical"].append(col)
 
-        # STEP 3: Detect Columns (only use columns not excluded)
-        excluded_cols = cleaning_report.get("excluded_columns", [])
-        columns = detect_columns(df)
-        
-        # Filter out excluded columns from visualization
-        for key in columns:
-            columns[key] = [col for col in columns[key] if col not in excluded_cols]
-        
-        # STEP 4: Get Summary Stats
+        # STEP 3: Get Summary Stats
         summary = get_summary(df)
         
-        # STEP 5: Anomalies
-        anomalies = detect_anomalies(df)
+        # STEP 4: Anomalies
+        anomalies_insights = []
+        if "outliers_detected" in metadata:
+            for col, count in metadata["outliers_detected"].items():
+                anomalies_insights.append(f"{count} outliers detected in {col}.")
         
-        # STEP 6: Recommendations (only for non-excluded columns)
-        charts = recommend_charts(columns)
+        # STEP 5: Recommendations
+        # PASS DF NOW
+        charts = recommend_charts(columns, df)
         
-        # STEP 7: Insights
-        # Combine anomalies into insights
+        # STEP 6: Insights
         generated_insights = generate_insights(df, summary)
-        all_insights = generated_insights + anomalies
+        all_insights = generated_insights + anomalies_insights
         
-        # STEP 8: Generate detailed dataset summary (NEW)
+        # STEP 7: Generator Wrappers (Conclusion etc)
         dataset_summary = generate_dataset_summary(df, columns)
-        
-        # STEP 9: Generate chart interpretations (NEW)
         chart_interpretations = generate_chart_interpretations(charts, df, columns)
-        
-        # STEP 10: Generate conclusion (NEW)
         conclusion = generate_conclusion(df, columns, summary, all_insights)
         
-        return {
+        result = {
             "cleaning_report": cleaning_report,
-            "dataset_summary": dataset_summary,  # NEW: Detailed dataset summary
+            "metadata": metadata, # Contains skewness, cardinality, relationships, column_types
+            "dataset_summary": dataset_summary,
             "columns": columns,
             "summary": summary,
             "recommended_charts": charts,
-            "chart_interpretations": chart_interpretations,  # NEW: 2-line interpretations
+            "chart_interpretations": chart_interpretations,
             "insights": all_insights,
-            "conclusion": conclusion,  # NEW: Conclusion section
+            "conclusion": conclusion,
             "data": df.fillna("").head(50).to_dict(orient="records")
         }
+        
+        # Cache for PDF generation (store DF and COLUMNS separately to avoid serialization issues in JSON if we needed to serialize)
+        # But here latest_analysis is in-memory dict, so storing DF is fine.
+        global latest_analysis
+        latest_analysis = {
+            "result": result,
+            "df": df,
+            "columns": columns
+        }
+        
+        return result
     
     except ValueError as ve:
         return {"error": str(ve)}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": f"An error occurred while processing the file: {str(e)}"}
+
+@app.get("/download_report")
+async def download_report():
+    if not latest_analysis:
+        return {"error": "No analysis available. Please upload a file first."}
+    
+    try:
+        # Retrieve cached data
+        result = latest_analysis.get("result")
+        df = latest_analysis.get("df")
+        columns = latest_analysis.get("columns")
+        
+        pdf_content = generate_pdf_report(result, df, columns)
+        
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=report.pdf"}
+        )
+    except Exception as e:
+         import traceback
+         traceback.print_exc()
+         return {"error": f"Failed to generate report: {str(e)}"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

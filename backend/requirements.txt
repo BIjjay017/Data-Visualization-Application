@@ -9,3 +9,6 @@ PyPDF2
 python-docx
 openpyxl
 xlrd
+matplotlib
+seaborn
+fpdf

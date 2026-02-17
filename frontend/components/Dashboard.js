@@ -36,9 +36,18 @@ export default function Dashboard({ data, onReset }) {
         >
             <div className={styles.header}>
                 <h2>Analysis Results</h2>
-                <button onClick={onReset} className={styles.resetButton}>
-                    Upload New File
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                        onClick={() => window.open('http://localhost:8000/download_report', '_blank')}
+                        className={styles.resetButton}
+                        style={{ backgroundColor: '#10b981' }}
+                    >
+                        Export Report (PDF)
+                    </button>
+                    <button onClick={onReset} className={styles.resetButton}>
+                        Upload New File
+                    </button>
+                </div>
             </div>
 
             {/* Data Cleaning Report */}
