@@ -2,6 +2,62 @@ import { motion } from 'framer-motion';
 import ChartRenderer from './ChartRenderer';
 import styles from '../styles/Dashboard.module.css';
 
+/**
+ * Highlights key terms in interpretation text.
+ * Wraps numbers, percentages, column names, and analytical keywords in <span> tags.
+ */
+function highlightKeyTerms(text) {
+    if (!text) return null;
+
+    // Patterns to highlight (order matters — more specific first)
+    const patterns = [
+        // Percentages (e.g., 45.2%, 100%)
+        { regex: /(\d+\.?\d*%)/g, className: styles.hlNumber },
+        // Numbers with commas/decimals (e.g., 1,234.56, 0.95, 42)
+        { regex: /\b(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\b/g, className: styles.hlNumber },
+        // Analytical keywords
+        { regex: /\b(increase[sd]?|decrease[sd]?|grow(?:th|ing|s)?|decline[sd]?|trend(?:s|ing)?|correlation|significant(?:ly)?|peak|highest|lowest|average|median|maximum|minimum|outlier[s]?|anomal(?:y|ies)|positive|negative|strong(?:ly)?|weak(?:ly)?|moderate(?:ly)?|dominant|notable|pattern[s]?|distribution|skew(?:ed)?|concentration|variation|volatil(?:e|ity)|consistent|inconsistent|steady|sharp|gradual)\b/gi, className: styles.hlKeyword },
+        // Quoted or bold column names (words in quotes or between **)
+        { regex: /["']([^"']+)["']/g, className: styles.hlColumn, group: 1 },
+    ];
+
+    // Build the combined regex with named groups
+    let result = text;
+    let parts = [{ text: result, highlighted: false }];
+
+    patterns.forEach(({ regex, className, group }) => {
+        const newParts = [];
+        parts.forEach(part => {
+            if (part.highlighted) {
+                newParts.push(part);
+                return;
+            }
+            const str = part.text;
+            let lastIndex = 0;
+            const localRegex = new RegExp(regex.source, regex.flags);
+            let match;
+            while ((match = localRegex.exec(str)) !== null) {
+                if (match.index > lastIndex) {
+                    newParts.push({ text: str.slice(lastIndex, match.index), highlighted: false });
+                }
+                const matchText = group !== undefined ? match[group] : match[0];
+                newParts.push({ text: matchText, highlighted: true, className });
+                lastIndex = localRegex.lastIndex;
+            }
+            if (lastIndex < str.length) {
+                newParts.push({ text: str.slice(lastIndex), highlighted: false });
+            }
+        });
+        parts = newParts;
+    });
+
+    return parts.map((part, i) =>
+        part.highlighted
+            ? <span key={i} className={part.className}>{part.text}</span>
+            : <span key={i}>{part.text}</span>
+    );
+}
+
 export default function Dashboard({ data, onReset }) {
     const { summary, insights, recommended_charts, columns, cleaning_report, dataset_summary, chart_interpretations, conclusion } = data;
 
@@ -228,9 +284,22 @@ export default function Dashboard({ data, onReset }) {
 
                         {/* Chart Interpretation */}
                         {chart_interpretations && chart_interpretations.find(ci => ci.chart_title === chart.title) && (
-                            <div className={styles.chartInterpretation}>
-                                <p>{chart_interpretations.find(ci => ci.chart_title === chart.title).interpretation}</p>
-                            </div>
+                            <motion.div
+                                className={styles.chartInterpretation}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.6 + idx * 0.1 }}
+                            >
+                                <div className={styles.interpretationHeader}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                    <span>Interpretation</span>
+                                </div>
+                                <p>{highlightKeyTerms(chart_interpretations.find(ci => ci.chart_title === chart.title).interpretation)}</p>
+                            </motion.div>
                         )}
                     </motion.div>
                 ))}

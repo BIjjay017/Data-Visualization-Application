@@ -12,3 +12,5 @@ xlrd
 matplotlib
 seaborn
 fpdf2
+openai
+python-dotenv

@@ -1,8 +1,17 @@
 from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
+from dotenv import load_dotenv
 import pandas as pd
+import numpy as np
 import io
+import json
 import uvicorn
+
+# Load environment variables from .env file
+load_dotenv()
+
 from file_parser import parse_file
 from data_cleaner import clean_data
 from data_processor import get_summary, detect_columns
@@ -10,22 +19,55 @@ from chart_recommender import recommend_charts
 from insight_generator import generate_insights
 from summary_generator import generate_dataset_summary, generate_chart_interpretations, generate_conclusion
 from report_generator import generate_pdf_report
+from chatbot import process_chat_message, generate_smart_suggestions
 
 app = FastAPI()
+
+def convert_numpy_types(obj):
+    """Recursively convert numpy types to native Python types for JSON serialization."""
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, (np.integer,)):
+        return int(obj)
+    elif isinstance(obj, (np.floating,)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    elif isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    elif pd.isna(obj):
+        return None
+    return obj
 
 # Global storage for latest analysis (simple caching for MVP)
 # In production, use Redis or a proper cache with session IDs
 latest_analysis = {}
 
+# Chat history storage
+chat_histories = {}
+
+# Pydantic models for chat
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ChatMessage]] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    suggestions: Optional[List[str]] = None
+
 # CORS configuration for production and development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Local development
-        "https://data-visualization-application-1t87.vercel.app",  # Production Vercel
-        "https://*.vercel.app"  # Any Vercel preview deployments
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -114,7 +156,7 @@ async def upload_file(file: UploadFile = File(...)):
             "columns": columns
         }
         
-        return result
+        return convert_numpy_types(result)
     
     except ValueError as ve:
         return {"error": str(ve)}
@@ -145,6 +187,84 @@ async def download_report():
          import traceback
          traceback.print_exc()
          return {"error": f"Failed to generate report: {str(e)}"}
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    """
+    Chat endpoint for interacting with the dataset using AI.
+    """
+    if not latest_analysis:
+        return {"error": "No data available. Please upload a file first."}
+    
+    try:
+        df = latest_analysis.get("df")
+        columns = latest_analysis.get("columns")
+        result = latest_analysis.get("result", {})
+        summary = result.get("summary", {})
+        insights = result.get("insights", [])
+        
+        # Convert chat history to proper format
+        history = None
+        if request.history:
+            history = [{"role": msg.role, "content": msg.content} for msg in request.history]
+        
+        # Process the message
+        response = process_chat_message(
+            message=request.message,
+            df=df,
+            columns=columns,
+            summary=summary,
+            insights=insights,
+            chat_history=history
+        )
+        
+        return {
+            "response": response,
+            "suggestions": None  # Suggestions only on initial load
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Chat error: {str(e)}"}
+
+
+@app.get("/chat/suggestions")
+async def get_chat_suggestions():
+    """
+    Get smart question suggestions based on the current dataset.
+    """
+    if not latest_analysis:
+        return {"suggestions": [
+            "Upload a file to start analyzing your data",
+            "What kind of data can I analyze?",
+            "How does the chatbot work?"
+        ]}
+    
+    try:
+        df = latest_analysis.get("df")
+        columns = latest_analysis.get("columns")
+        result = latest_analysis.get("result", {})
+        insights = result.get("insights", [])
+        
+        suggestions = generate_smart_suggestions(df, columns, insights)
+        
+        return {"suggestions": suggestions}
+        
+    except Exception as e:
+        return {"suggestions": [
+            "What patterns exist in my data?",
+            "Give me a summary of this dataset",
+            "What are the key insights?"
+        ]}
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "has_data": bool(latest_analysis)}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

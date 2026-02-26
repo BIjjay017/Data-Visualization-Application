@@ -3,10 +3,12 @@ import Head from 'next/head';
 import Upload from '../components/Upload';
 import Dashboard from '../components/Dashboard';
 import ThemeToggle from '../components/ThemeToggle';
+import Chatbot from '../components/Chatbot';
 import styles from '../styles/Home.module.css';
 
 export default function Home() {
   const [analysisData, setAnalysisData] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <div className={styles.container}>
@@ -33,6 +35,14 @@ export default function Home() {
           <Dashboard data={analysisData} onReset={() => setAnalysisData(null)} />
         )}
       </main>
+
+      {/* AI Chatbot - available when data is loaded */}
+      {analysisData && (
+        <Chatbot 
+          isOpen={chatOpen} 
+          onToggle={() => setChatOpen(!chatOpen)} 
+        />
+      )}
     </div>
   );
 }

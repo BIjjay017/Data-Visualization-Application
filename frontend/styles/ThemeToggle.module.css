@@ -14,7 +14,7 @@
     justify-content: center;
     box-shadow: var(--shadow-md);
     transition: all 0.3s ease;
-    z-index: 1000;
+    z-index: 998;
 }
 
 .toggleButton:hover {
