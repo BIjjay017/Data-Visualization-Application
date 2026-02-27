@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import io
 import json
+import os
 import uvicorn
 
 # Load environment variables from .env file
