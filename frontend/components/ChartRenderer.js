@@ -70,8 +70,8 @@ export default function ChartRenderer({ chart, data }) {
                         <AreaChart data={chartData}>
                             <defs>
                                 <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -261,8 +261,8 @@ export default function ChartRenderer({ chart, data }) {
                 const cellSize = Math.min(50, 300 / columns.length);
                 return (
                     <div style={{ padding: '20px', overflowX: 'auto' }}>
-                        <div style={{ 
-                            display: 'grid', 
+                        <div style={{
+                            display: 'grid',
                             gridTemplateColumns: `80px repeat(${columns.length}, ${cellSize}px)`,
                             gap: '2px',
                             fontSize: '10px'
@@ -270,8 +270,8 @@ export default function ChartRenderer({ chart, data }) {
                             {/* Header row */}
                             <div></div>
                             {columns.map((col, idx) => (
-                                <div key={`header-${idx}`} style={{ 
-                                    transform: 'rotate(-45deg)', 
+                                <div key={`header-${idx}`} style={{
+                                    transform: 'rotate(-45deg)',
                                     transformOrigin: 'left bottom',
                                     whiteSpace: 'nowrap',
                                     color: '#9ca3af',
@@ -285,9 +285,9 @@ export default function ChartRenderer({ chart, data }) {
                             {/* Data rows */}
                             {columns.map((rowCol, rowIdx) => (
                                 <>
-                                    <div key={`row-${rowIdx}`} style={{ 
-                                        color: '#9ca3af', 
-                                        display: 'flex', 
+                                    <div key={`row-${rowIdx}`} style={{
+                                        color: '#9ca3af',
+                                        display: 'flex',
                                         alignItems: 'center',
                                         paddingRight: '5px',
                                         overflow: 'hidden',
@@ -299,7 +299,7 @@ export default function ChartRenderer({ chart, data }) {
                                         const cellData = chartData.find(d => d.x === colCol && d.y === rowCol);
                                         const value = cellData?.value || 0;
                                         return (
-                                            <div 
+                                            <div
                                                 key={`cell-${rowIdx}-${colIdx}`}
                                                 style={{
                                                     width: cellSize,
@@ -339,14 +339,28 @@ export default function ChartRenderer({ chart, data }) {
             case 'boxPlot':
                 const boxData = chartData[0];
                 if (!boxData) return <div>No data available</div>;
-                
+
+                // Prepare data for Recharts - we'll use a Bar for the IQR (Q1 to Q3)
+                // and ReferenceLines for whiskers and median.
+                const boxPlotData = [{
+                    name: boxData.name || 'Dataset',
+                    q1: boxData.q1,
+                    q3: boxData.q3,
+                    median: boxData.median,
+                    min: boxData.min,
+                    max: boxData.max,
+                    iqr: [boxData.q1, boxData.q3], // Recharts Bar can takes [start, end]
+                    lowerWhisker: [boxData.min, boxData.q1],
+                    upperWhisker: [boxData.q3, boxData.max]
+                }];
+
                 return (
                     <div style={{ padding: '20px' }}>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <ComposedChart data={[boxData]} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                                <XAxis type="number" stroke="#9ca3af" domain={['dataMin - 10', 'dataMax + 10']} />
-                                <YAxis dataKey="name" type="category" stroke="#9ca3af" width={100} />
+                        <ResponsiveContainer width="100%" height={300}>
+                            <ComposedChart data={boxPlotData} layout="vertical" margin={{ top: 20, right: 30, left: 40, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
+                                <XAxis type="number" stroke="#9ca3af" domain={['auto', 'auto']} />
+                                <YAxis dataKey="name" type="category" stroke="#9ca3af" />
                                 <Tooltip
                                     contentStyle={{
                                         backgroundColor: '#1f2937',
@@ -354,42 +368,58 @@ export default function ChartRenderer({ chart, data }) {
                                         borderRadius: '8px',
                                         color: '#fff'
                                     }}
-                                    formatter={(value, name) => [value, name]}
                                 />
+                                {/* Bottom Whisker */}
+                                <Bar dataKey="lowerWhisker" fill="none" stroke="#9ca3af" strokeWidth={2} stackId="a" isAnimationActive={false} />
+                                {/* Box (IQR) */}
+                                <Bar dataKey="iqr" fill="#8b5cf6" radius={[4, 4, 4, 4]} opacity={0.8} />
+                                {/* Top Whisker */}
+                                <Bar dataKey="upperWhisker" fill="none" stroke="#9ca3af" strokeWidth={2} stackId="a" isAnimationActive={false} />
+
+                                {/* Median Line */}
+                                <ReferenceLine x={boxData.median} stroke="#10b981" strokeWidth={3} label={{ position: 'top', value: 'Median', fill: '#10b981', fontSize: 10 }} />
+
+                                {/* Outliers as dots */}
+                                {boxData.outliers && boxData.outliers.map((val, idx) => (
+                                    <ReferenceLine key={idx} x={val} stroke="#f59e0b" strokeWidth={1} strokeDasharray="3 3" />
+                                ))}
                             </ComposedChart>
                         </ResponsiveContainer>
-                        <div style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-around', 
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-around',
                             padding: '15px',
-                            backgroundColor: 'var(--bg-secondary)',
-                            borderRadius: '8px',
-                            marginTop: '10px'
+                            backgroundColor: 'rgba(31, 41, 55, 0.5)',
+                            borderRadius: '12px',
+                            border: '1px solid #374151',
+                            marginTop: '20px',
+                            flexWrap: 'wrap',
+                            gap: '10px'
                         }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px' }}>Min</div>
-                                <div style={{ color: '#fff', fontWeight: '600' }}>{boxData.min}</div>
+                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Min</div>
+                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.min.toFixed(2)}</div>
                             </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px' }}>Q1</div>
-                                <div style={{ color: '#fff', fontWeight: '600' }}>{boxData.q1}</div>
+                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Q1</div>
+                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.q1.toFixed(2)}</div>
                             </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px' }}>Median</div>
-                                <div style={{ color: '#10b981', fontWeight: '600' }}>{boxData.median}</div>
+                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                <div style={{ color: '#10b981', fontSize: '11px', textTransform: 'uppercase' }}>Median</div>
+                                <div style={{ color: '#10b981', fontWeight: '800', fontSize: '1.2rem' }}>{boxData.median.toFixed(2)}</div>
                             </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px' }}>Q3</div>
-                                <div style={{ color: '#fff', fontWeight: '600' }}>{boxData.q3}</div>
+                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Q3</div>
+                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.q3.toFixed(2)}</div>
                             </div>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px' }}>Max</div>
-                                <div style={{ color: '#fff', fontWeight: '600' }}>{boxData.max}</div>
+                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Max</div>
+                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.max.toFixed(2)}</div>
                             </div>
                             {boxData.outliers && boxData.outliers.length > 0 && (
-                                <div style={{ textAlign: 'center' }}>
-                                    <div style={{ color: '#f59e0b', fontSize: '11px' }}>Outliers</div>
-                                    <div style={{ color: '#f59e0b', fontWeight: '600' }}>{boxData.outliers.length}</div>
+                                <div style={{ textAlign: 'center', minWidth: '60px' }}>
+                                    <div style={{ color: '#f59e0b', fontSize: '11px', textTransform: 'uppercase' }}>Outliers</div>
+                                    <div style={{ color: '#f59e0b', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.outliers.length}</div>
                                 </div>
                             )}
                         </div>

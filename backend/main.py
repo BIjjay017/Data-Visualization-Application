@@ -21,6 +21,12 @@ from insight_generator import generate_insights
 from summary_generator import generate_dataset_summary, generate_chart_interpretations, generate_conclusion
 from report_generator import generate_pdf_report
 from chatbot import process_chat_message, generate_smart_suggestions
+from database import init_db, SessionLocal, AnalysisResult, get_db
+from sqlalchemy.orm import Session
+from fastapi import Depends
+
+# Initialize Database
+init_db()
 
 app = FastAPI()
 
@@ -132,8 +138,8 @@ async def upload_file(file: UploadFile = File(...)):
         
         # STEP 7: Generator Wrappers (Conclusion etc)
         dataset_summary = generate_dataset_summary(df, columns)
-        chart_interpretations = generate_chart_interpretations(charts, df, columns)
-        conclusion = generate_conclusion(df, columns, summary, all_insights)
+        chart_interpretations = await generate_chart_interpretations(charts, df, columns)
+        conclusion = await generate_conclusion(df, columns, summary, all_insights)
         
         result = {
             "cleaning_report": cleaning_report,
@@ -147,6 +153,22 @@ async def upload_file(file: UploadFile = File(...)):
             "conclusion": conclusion,
             "data": df.fillna("").head(50).to_dict(orient="records")
         }
+
+        # STEP 8: Save to Database for future reference
+        try:
+            db = SessionLocal()
+            db_analysis = AnalysisResult(
+                filename=file.filename,
+                result_data=convert_numpy_types(result),
+                data_preview=df.fillna("").head(20).to_dict(orient="records")
+            )
+            db.add(db_analysis)
+            db.commit()
+            db.refresh(db_analysis)
+            result["id"] = db_analysis.id
+            db.close()
+        except Exception as db_err:
+            print(f"Database save failed: {db_err}")
         
         # Cache for PDF generation (store DF and COLUMNS separately to avoid serialization issues in JSON if we needed to serialize)
         # But here latest_analysis is in-memory dict, so storing DF is fine.
@@ -165,6 +187,36 @@ async def upload_file(file: UploadFile = File(...)):
         import traceback
         traceback.print_exc()
         return {"error": f"An error occurred while processing the file: {str(e)}"}
+
+@app.get("/history")
+async def get_history(db: Session = Depends(get_db)):
+    """List previous analyses."""
+    history = db.query(AnalysisResult).order_by(AnalysisResult.upload_date.desc()).all()
+    return [{
+        "id": item.id,
+        "filename": item.filename,
+        "date": item.upload_date.isoformat(),
+        # Add a summary if needed
+    } for item in history]
+
+@app.get("/history/{item_id}")
+async def get_history_item(item_id: int, db: Session = Depends(get_db)):
+    """Retrieve a specific analysis."""
+    item = db.query(AnalysisResult).filter(AnalysisResult.id == item_id).first()
+    if not item:
+        return {"error": "Analysis not found"}
+    
+    # Update latest_analysis for chat/download
+    global latest_analysis
+    # We don't have the full DF here easily without re-parsing, 
+    # but we can store the result data for basic interaction.
+    latest_analysis = {
+        "result": item.result_data,
+        "df": pd.DataFrame(item.data_preview), # Limited context for chat
+        "columns": item.result_data.get("columns", {})
+    }
+    
+    return item.result_data
 
 @app.get("/download_report")
 async def download_report():

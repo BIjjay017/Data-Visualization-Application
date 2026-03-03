@@ -217,15 +217,8 @@ export default function Upload({ onAnalysisComplete }) {
 
                 {loading && (
                     <div className={styles.loadingContainer}>
-                        <video
-                            className={styles.loadingVideo}
-                            autoPlay
-                            loop
-                            muted
-                        >
-                            <source src="/loading.webm" type="video/webm" />
-                        </video>
-                        <p className={styles.loadingText}>Processing your data...</p>
+                        <div className={styles.loader}></div>
+                        <p className={styles.loadingText}>Analyzing Data</p>
                     </div>
                 )}
 

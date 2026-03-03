@@ -6,22 +6,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _get_llm_client():
+async def _get_llm_client():
     """Get the Groq LLM client. Returns None if not configured."""
     try:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
         api_key = os.environ.get("GROQ_API_KEY")
         if not api_key:
             return None
-        return OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
+        return AsyncOpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
     except Exception:
         return None
 
 
-def _llm_generate(client, prompt, max_tokens=300):
+async def _llm_generate(client, prompt, max_tokens=300):
     """Call the LLM and return the response text. Returns None on failure."""
     try:
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": "You are a concise data analysis expert. Provide clear, actionable insights. Be specific with numbers. No markdown formatting."},
@@ -121,22 +121,16 @@ def _build_chart_data_summary(chart, df):
     return "\n".join(lines)
 
 
-def generate_chart_interpretations(charts, df, column_types):
+async def generate_chart_interpretations(charts, df, column_types):
     """
     Generate LLM-powered interpretations for each chart.
     Falls back to rule-based interpretations if LLM is unavailable.
     """
-    client = _get_llm_client()
-    interpretations = []
-
+    import asyncio
+    client = await _get_llm_client()
+    
+    tasks = []
     for chart in charts:
-        chart_type = chart.get("type")
-        x_col = chart.get("x")
-        y_col = chart.get("y")
-        title = chart.get("title", "")
-
-        # --- Try LLM interpretation ---
-        llm_text = None
         if client:
             data_summary = _build_chart_data_summary(chart, df)
             prompt = (
@@ -144,7 +138,17 @@ def generate_chart_interpretations(charts, df, column_types):
                 f"Mention the most important pattern, the key numbers, and one actionable takeaway.\n\n"
                 f"{data_summary}"
             )
-            llm_text = _llm_generate(client, prompt, max_tokens=200)
+            tasks.append(_llm_generate(client, prompt, max_tokens=200))
+        else:
+            tasks.append(asyncio.sleep(0, result=None)) # Placeholder
+
+    llm_results = await asyncio.gather(*tasks)
+    
+    interpretations = []
+    for i, chart in enumerate(charts):
+        title = chart.get("title", "")
+        chart_type = chart.get("type")
+        llm_text = llm_results[i]
 
         # --- Fallback: rule-based ---
         if not llm_text:
@@ -217,7 +221,7 @@ def _fallback_interpretation(chart, df):
 
     return f"This {chart_type} chart visualizes {chart.get('title', 'the data')}."
 
-def generate_conclusion(df, column_types, summary_stats, insights):
+async def generate_conclusion(df, column_types, summary_stats, insights):
     """
     Generate a conclusion section summarizing the dataset, enhanced with LLM when available.
     """
@@ -233,7 +237,7 @@ def generate_conclusion(df, column_types, summary_stats, insights):
     }
 
     # --- Try LLM-powered conclusion ---
-    client = _get_llm_client()
+    client = await _get_llm_client()
     if client:
         context_lines = [
             f"Dataset: {len(df)} rows, {len(df.columns)} columns.",
@@ -269,7 +273,7 @@ def generate_conclusion(df, column_types, summary_stats, insights):
             + "\n".join(context_lines)
         )
 
-        llm_text = _llm_generate(client, prompt, max_tokens=400)
+        llm_text = await _llm_generate(client, prompt, max_tokens=400)
         if llm_text:
             lines = llm_text.strip().split("\n")
             for line in lines:
