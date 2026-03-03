@@ -336,93 +336,64 @@ export default function ChartRenderer({ chart, data }) {
                     </div>
                 );
 
-            case 'boxPlot':
-                const boxData = chartData[0];
-                if (!boxData) return <div>No data available</div>;
-
-                // Prepare data for Recharts - we'll use a Bar for the IQR (Q1 to Q3)
-                // and ReferenceLines for whiskers and median.
-                const boxPlotData = [{
-                    name: boxData.name || 'Dataset',
-                    q1: boxData.q1,
-                    q3: boxData.q3,
-                    median: boxData.median,
-                    min: boxData.min,
-                    max: boxData.max,
-                    iqr: [boxData.q1, boxData.q3], // Recharts Bar can takes [start, end]
-                    lowerWhisker: [boxData.min, boxData.q1],
-                    upperWhisker: [boxData.q3, boxData.max]
-                }];
-
+            case 'image':
                 return (
-                    <div style={{ padding: '20px' }}>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <ComposedChart data={boxPlotData} layout="vertical" margin={{ top: 20, right: 30, left: 40, bottom: 20 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                                <XAxis type="number" stroke="#9ca3af" domain={['auto', 'auto']} />
-                                <YAxis dataKey="name" type="category" stroke="#9ca3af" />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: '#1f2937',
-                                        border: '1px solid #374151',
-                                        borderRadius: '8px',
-                                        color: '#fff'
-                                    }}
-                                />
-                                {/* Bottom Whisker */}
-                                <Bar dataKey="lowerWhisker" fill="none" stroke="#9ca3af" strokeWidth={2} stackId="a" isAnimationActive={false} />
-                                {/* Box (IQR) */}
-                                <Bar dataKey="iqr" fill="#8b5cf6" radius={[4, 4, 4, 4]} opacity={0.8} />
-                                {/* Top Whisker */}
-                                <Bar dataKey="upperWhisker" fill="none" stroke="#9ca3af" strokeWidth={2} stackId="a" isAnimationActive={false} />
-
-                                {/* Median Line */}
-                                <ReferenceLine x={boxData.median} stroke="#10b981" strokeWidth={3} label={{ position: 'top', value: 'Median', fill: '#10b981', fontSize: 10 }} />
-
-                                {/* Outliers as dots */}
-                                {boxData.outliers && boxData.outliers.map((val, idx) => (
-                                    <ReferenceLine key={idx} x={val} stroke="#f59e0b" strokeWidth={1} strokeDasharray="3 3" />
-                                ))}
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                    <div style={{
+                        width: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '1.5rem',
+                        padding: '10px'
+                    }}>
                         <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-around',
-                            padding: '15px',
+                            width: '100%',
+                            borderRadius: '12px',
+                            overflow: 'hidden',
+                            border: '1px solid #374151',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                            background: '#fff' // White background for the plot area itself for better contrast
+                        }}>
+                            <img
+                                src={chart.imageData}
+                                alt={title}
+                                style={{
+                                    width: '100%',
+                                    height: 'auto',
+                                    display: 'block'
+                                }}
+                            />
+                        </div>
+
+                        {/* Legend/Info panel for Seaborn plots */}
+                        <div style={{
+                            width: '100%',
+                            padding: '1rem',
                             backgroundColor: 'rgba(31, 41, 55, 0.5)',
                             borderRadius: '12px',
                             border: '1px solid #374151',
-                            marginTop: '20px',
-                            flexWrap: 'wrap',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
                             gap: '10px'
                         }}>
-                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Min</div>
-                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.min.toFixed(2)}</div>
-                            </div>
-                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Q1</div>
-                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.q1.toFixed(2)}</div>
-                            </div>
-                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                                <div style={{ color: '#10b981', fontSize: '11px', textTransform: 'uppercase' }}>Median</div>
-                                <div style={{ color: '#10b981', fontWeight: '800', fontSize: '1.2rem' }}>{boxData.median.toFixed(2)}</div>
-                            </div>
-                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Q3</div>
-                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.q3.toFixed(2)}</div>
-                            </div>
-                            <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                                <div style={{ color: '#9ca3af', fontSize: '11px', textTransform: 'uppercase' }}>Max</div>
-                                <div style={{ color: '#fff', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.max.toFixed(2)}</div>
-                            </div>
-                            {boxData.outliers && boxData.outliers.length > 0 && (
-                                <div style={{ textAlign: 'center', minWidth: '60px' }}>
-                                    <div style={{ color: '#f59e0b', fontSize: '11px', textTransform: 'uppercase' }}>Outliers</div>
-                                    <div style={{ color: '#f59e0b', fontWeight: '700', fontSize: '1.1rem' }}>{boxData.outliers.length}</div>
-                                </div>
-                            )}
+                            <div style={{
+                                width: '12px',
+                                height: '12px',
+                                backgroundColor: '#f08080',
+                                borderRadius: '2px'
+                            }}></div>
+                            <span style={{ color: '#9ca3af', fontSize: '13px' }}>
+                                Statistical distribution generated via Seaborn (Accurate box-whisker representation)
+                            </span>
                         </div>
+                    </div>
+                );
+
+            case 'boxPlot':
+                return (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af' }}>
+                        Reconfiguring box plot renderer...
                     </div>
                 );
 

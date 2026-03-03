@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import uuid
+import base64
+from io import BytesIO
 
 class PDFReport(FPDF):
     def header(self):
@@ -105,6 +107,35 @@ def generate_chart_images(df, columns):
         images.append({"title": "Correlation Matrix", "path": filename})
         
     return images
+
+
+def generate_seaborn_boxplot_base64(df, column):
+    """
+    Generates a high-quality Seaborn boxplot and returns it as a base64 string.
+    """
+    try:
+        # Set style
+        sns.set_theme(style="whitegrid", palette="pastel")
+        plt.figure(figsize=(8, 5))
+        
+        # Create boxplot
+        ax = sns.boxplot(data=df, y=column, color="#f08080")
+        sns.stripplot(data=df, y=column, color="#333", alpha=0.3, size=4) # Add jitter for better visualization
+        
+        plt.title(f"Statistical Distribution of {column}", fontsize=14, fontweight='bold', pad=15)
+        plt.ylabel(column, fontsize=12)
+        
+        # Save to buffer
+        buf = BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', dpi=100)
+        plt.close()
+        
+        # Encode to base64
+        base64_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{base64_str}"
+    except Exception as e:
+        print(f"Error generating Seaborn boxplot: {e}")
+        return None
 
 def generate_pdf_report(analysis_results, df=None, columns=None, filename="report.pdf"):
     pdf = PDFReport()

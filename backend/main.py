@@ -19,7 +19,7 @@ from data_processor import get_summary, detect_columns
 from chart_recommender import recommend_charts
 from insight_generator import generate_insights
 from summary_generator import generate_dataset_summary, generate_chart_interpretations, generate_conclusion
-from report_generator import generate_pdf_report
+from report_generator import generate_pdf_report, generate_seaborn_boxplot_base64
 from chatbot import process_chat_message, generate_smart_suggestions
 from database import init_db, SessionLocal, AnalysisResult, get_db
 from sqlalchemy.orm import Session
@@ -131,6 +131,16 @@ async def upload_file(file: UploadFile = File(...)):
         # STEP 5: Recommendations
         # PASS DF NOW
         charts = recommend_charts(columns, df)
+        
+        # Post-process charts: Replace or augment Box Plots with Seaborn images
+        for chart in charts:
+            if chart.get("type") == "boxPlot":
+                col = chart.get("column")
+                if col:
+                    img_base64 = generate_seaborn_boxplot_base64(df, col)
+                    if img_base64:
+                        chart["type"] = "image"
+                        chart["imageData"] = img_base64
         
         # STEP 6: Insights
         generated_insights = generate_insights(df, summary)
