@@ -40,7 +40,17 @@ def _get_allowed_origins() -> List[str]:
         "ALLOWED_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000",
     )
-    return [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
+    origins = []
+    for origin in configured_origins.split(","):
+        cleaned = origin.strip().rstrip("/")
+        if cleaned:
+            origins.append(cleaned)
+    return origins
+
+
+def _get_allowed_origin_regex() -> Optional[str]:
+    regex = os.environ.get("ALLOWED_ORIGIN_REGEX", "").strip()
+    return regex or None
 
 def convert_numpy_types(obj):
     """Recursively convert numpy types to native Python types for JSON serialization."""
@@ -82,6 +92,7 @@ class ChatResponse(BaseModel):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_allowed_origins(),
+    allow_origin_regex=_get_allowed_origin_regex(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -44,6 +44,9 @@
 
 3. **Environment Variables** (if needed)
    - Set in Render dashboard
+   - Required for CORS:
+     - `ALLOWED_ORIGINS=https://visualization-tool-omega.vercel.app,http://localhost:3000,http://127.0.0.1:3000`
+     - `ALLOWED_ORIGIN_REGEX=^https://.*\\.vercel\\.app$`
 
 ### Frontend (Vercel)
 
