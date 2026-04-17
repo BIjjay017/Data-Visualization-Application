@@ -1,13 +1,13 @@
-from fastapi import FastAPI, UploadFile, File, Response
+from fastapi import FastAPI, UploadFile, File, Response, Depends, Header, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
-import io
-import json
 import os
+import secrets
+import logging
 import uvicorn
 
 # Load environment variables from .env file
@@ -15,7 +15,7 @@ load_dotenv()
 
 from file_parser import parse_file
 from data_cleaner import clean_data
-from data_processor import get_summary, detect_columns
+from data_processor import get_summary
 from chart_recommender import recommend_charts
 from insight_generator import generate_insights
 from summary_generator import generate_dataset_summary, generate_chart_interpretations, generate_conclusion
@@ -23,12 +23,24 @@ from report_generator import generate_pdf_report, generate_seaborn_boxplot_base6
 from chatbot import process_chat_message, generate_smart_suggestions
 from database import init_db, SessionLocal, AnalysisResult, get_db
 from sqlalchemy.orm import Session
-from fastapi import Depends
 
 # Initialize Database
 init_db()
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
+
+MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "50"))
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+ALLOWED_EXTENSIONS = {"csv", "xls", "xlsx", "pdf", "doc", "docx"}
+
+
+def _get_allowed_origins() -> List[str]:
+    configured_origins = os.environ.get(
+        "ALLOWED_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    )
+    return [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
 
 def convert_numpy_types(obj):
     """Recursively convert numpy types to native Python types for JSON serialization."""
@@ -50,12 +62,8 @@ def convert_numpy_types(obj):
         return None
     return obj
 
-# Global storage for latest analysis (simple caching for MVP)
-# In production, use Redis or a proper cache with session IDs
+# In-memory session cache: session_id -> analysis payload
 latest_analysis = {}
-
-# Chat history storage
-chat_histories = {}
 
 # Pydantic models for chat
 class ChatMessage(BaseModel):
@@ -73,16 +81,35 @@ class ChatResponse(BaseModel):
 # CORS configuration for production and development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=_get_allowed_origins(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+def resolve_session_id(
+    x_session_id: Optional[str] = Header(default=None, alias="X-Session-Id"),
+    session_id: Optional[str] = Query(default=None),
+) -> str:
+    resolved = x_session_id or session_id
+    if not resolved:
+        raise HTTPException(status_code=401, detail="Missing session ID")
+    return resolved
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
+        if not file.filename:
+            raise ValueError("File must include a valid name")
+
+        extension = file.filename.rsplit('.', 1)[-1].lower()
+        if extension not in ALLOWED_EXTENSIONS:
+            raise ValueError(f"Unsupported file format: {extension}")
+
         contents = await file.read()
+        if len(contents) > MAX_UPLOAD_SIZE_BYTES:
+            raise ValueError(f"File is too large. Maximum size is {MAX_UPLOAD_SIZE_MB}MB")
         
         # Parse file based on type
         df_original = parse_file(contents, file.filename)
@@ -150,8 +177,11 @@ async def upload_file(file: UploadFile = File(...)):
         dataset_summary = generate_dataset_summary(df, columns)
         chart_interpretations = await generate_chart_interpretations(charts, df, columns)
         conclusion = await generate_conclusion(df, columns, summary, all_insights)
+
+        session_id = secrets.token_urlsafe(24)
         
         result = {
+            "session_id": session_id,
             "cleaning_report": cleaning_report,
             "metadata": metadata, # Contains skewness, cardinality, relationships, column_types
             "dataset_summary": dataset_summary,
@@ -178,12 +208,11 @@ async def upload_file(file: UploadFile = File(...)):
             result["id"] = db_analysis.id
             db.close()
         except Exception as db_err:
-            print(f"Database save failed: {db_err}")
+            logger.warning("Database save failed: %s", db_err)
         
         # Cache for PDF generation (store DF and COLUMNS separately to avoid serialization issues in JSON if we needed to serialize)
         # But here latest_analysis is in-memory dict, so storing DF is fine.
-        global latest_analysis
-        latest_analysis = {
+        latest_analysis[session_id] = {
             "result": result,
             "df": df,
             "columns": columns
@@ -192,52 +221,60 @@ async def upload_file(file: UploadFile = File(...)):
         return convert_numpy_types(result)
     
     except ValueError as ve:
-        return {"error": str(ve)}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"error": f"An error occurred while processing the file: {str(e)}"}
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+    except Exception as exc:
+        logger.exception("An error occurred while processing upload")
+        raise HTTPException(
+            status_code=500,
+            detail="An internal error occurred while processing the file",
+        ) from exc
 
 @app.get("/history")
-async def get_history(db: Session = Depends(get_db)):
+async def get_history(session_id: str = Depends(resolve_session_id), db: Session = Depends(get_db)):
     """List previous analyses."""
     history = db.query(AnalysisResult).order_by(AnalysisResult.upload_date.desc()).all()
-    return [{
-        "id": item.id,
-        "filename": item.filename,
-        "date": item.upload_date.isoformat(),
-        # Add a summary if needed
-    } for item in history]
+    response = []
+    for item in history:
+        result_data = item.result_data or {}
+        if isinstance(result_data, dict) and result_data.get("session_id") == session_id:
+            response.append({
+                "id": item.id,
+                "filename": item.filename,
+                "date": item.upload_date.isoformat(),
+            })
+    return response
 
 @app.get("/history/{item_id}")
-async def get_history_item(item_id: int, db: Session = Depends(get_db)):
+async def get_history_item(item_id: int, session_id: str = Depends(resolve_session_id), db: Session = Depends(get_db)):
     """Retrieve a specific analysis."""
     item = db.query(AnalysisResult).filter(AnalysisResult.id == item_id).first()
     if not item:
-        return {"error": "Analysis not found"}
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    result_data = item.result_data or {}
+    if not isinstance(result_data, dict) or result_data.get("session_id") != session_id:
+        raise HTTPException(status_code=404, detail="Analysis not found")
     
-    # Update latest_analysis for chat/download
-    global latest_analysis
-    # We don't have the full DF here easily without re-parsing, 
-    # but we can store the result data for basic interaction.
-    latest_analysis = {
-        "result": item.result_data,
+    # Update session cache for chat/download
+    latest_analysis[session_id] = {
+        "result": result_data,
         "df": pd.DataFrame(item.data_preview), # Limited context for chat
-        "columns": item.result_data.get("columns", {})
+        "columns": result_data.get("columns", {})
     }
     
-    return item.result_data
+    return result_data
 
 @app.get("/download_report")
-async def download_report():
-    if not latest_analysis:
-        return {"error": "No analysis available. Please upload a file first."}
+async def download_report(session_id: str = Depends(resolve_session_id)):
+    analysis = latest_analysis.get(session_id)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="No analysis available for this session")
     
     try:
         # Retrieve cached data
-        result = latest_analysis.get("result")
-        df = latest_analysis.get("df")
-        columns = latest_analysis.get("columns")
+        result = analysis.get("result")
+        df = analysis.get("df")
+        columns = analysis.get("columns")
         
         pdf_content = generate_pdf_report(result, df, columns)
         
@@ -246,24 +283,24 @@ async def download_report():
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=report.pdf"}
         )
-    except Exception as e:
-         import traceback
-         traceback.print_exc()
-         return {"error": f"Failed to generate report: {str(e)}"}
+    except Exception as exc:
+        logger.exception("Failed to generate report")
+        raise HTTPException(status_code=500, detail="Failed to generate report") from exc
 
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, session_id: str = Depends(resolve_session_id)):
     """
     Chat endpoint for interacting with the dataset using AI.
     """
-    if not latest_analysis:
-        return {"error": "No data available. Please upload a file first."}
+    analysis = latest_analysis.get(session_id)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="No data available for this session")
     
     try:
-        df = latest_analysis.get("df")
-        columns = latest_analysis.get("columns")
-        result = latest_analysis.get("result", {})
+        df = analysis.get("df")
+        columns = analysis.get("columns")
+        result = analysis.get("result", {})
         summary = result.get("summary", {})
         insights = result.get("insights", [])
         
@@ -287,18 +324,18 @@ async def chat(request: ChatRequest):
             "suggestions": None  # Suggestions only on initial load
         }
         
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"error": f"Chat error: {str(e)}"}
+    except Exception as exc:
+        logger.exception("Chat processing failed")
+        raise HTTPException(status_code=500, detail="Chat request failed") from exc
 
 
 @app.get("/chat/suggestions")
-async def get_chat_suggestions():
+async def get_chat_suggestions(session_id: str = Depends(resolve_session_id)):
     """
     Get smart question suggestions based on the current dataset.
     """
-    if not latest_analysis:
+    analysis = latest_analysis.get(session_id)
+    if not analysis:
         return {"suggestions": [
             "Upload a file to start analyzing your data",
             "What kind of data can I analyze?",
@@ -306,16 +343,16 @@ async def get_chat_suggestions():
         ]}
     
     try:
-        df = latest_analysis.get("df")
-        columns = latest_analysis.get("columns")
-        result = latest_analysis.get("result", {})
+        df = analysis.get("df")
+        columns = analysis.get("columns")
+        result = analysis.get("result", {})
         insights = result.get("insights", [])
         
         suggestions = generate_smart_suggestions(df, columns, insights)
         
         return {"suggestions": suggestions}
         
-    except Exception as e:
+    except Exception:
         return {"suggestions": [
             "What patterns exist in my data?",
             "Give me a summary of this dataset",
@@ -326,7 +363,7 @@ async def get_chat_suggestions():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "has_data": bool(latest_analysis)}
+    return {"status": "healthy", "active_sessions": len(latest_analysis)}
 
 
 if __name__ == "__main__":
