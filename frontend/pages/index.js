@@ -15,7 +15,7 @@ export default function Home() {
       <Head>
         <title>Data Visualization App</title>
         <meta name="description" content="Smart Data Visualization Application" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </Head>
 
       <ThemeToggle />
@@ -32,7 +32,13 @@ export default function Home() {
         {!analysisData ? (
           <Upload onAnalysisComplete={setAnalysisData} />
         ) : (
-          <Dashboard data={analysisData} onReset={() => setAnalysisData(null)} />
+          <Dashboard
+            data={analysisData}
+            onReset={() => {
+              setAnalysisData(null);
+              setChatOpen(false);
+            }}
+          />
         )}
       </main>
 
@@ -41,6 +47,7 @@ export default function Home() {
         <Chatbot 
           isOpen={chatOpen} 
           onToggle={() => setChatOpen(!chatOpen)} 
+          sessionId={analysisData.session_id}
         />
       )}
     </div>

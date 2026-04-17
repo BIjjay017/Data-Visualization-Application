@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import ChartRenderer from './ChartRenderer';
 import styles from '../styles/Dashboard.module.css';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 /**
  * Highlights key terms in interpretation text.
  * Wraps numbers, percentages, column names, and analytical keywords in <span> tags.
@@ -60,6 +62,7 @@ function highlightKeyTerms(text) {
 
 export default function Dashboard({ data, onReset }) {
     const { summary, insights, recommended_charts, columns, cleaning_report, dataset_summary, chart_interpretations, conclusion } = data;
+    const sessionId = data?.session_id;
 
     // Extract key metrics from summary
     const getKeyMetrics = () => {
@@ -94,9 +97,14 @@ export default function Dashboard({ data, onReset }) {
                 <h2>Analysis Results</h2>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button
-                        onClick={() => window.open('http://localhost:8000/download_report', '_blank')}
+                        onClick={() => {
+                            if (!sessionId) return;
+                            const reportUrl = `${API_URL}/download_report?session_id=${encodeURIComponent(sessionId)}`;
+                            window.open(reportUrl, '_blank', 'noopener,noreferrer');
+                        }}
                         className={styles.resetButton}
                         style={{ backgroundColor: '#10b981' }}
+                        disabled={!sessionId}
                     >
                         Export Report (PDF)
                     </button>

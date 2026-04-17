@@ -5,7 +5,7 @@ import styles from '../styles/Chatbot.module.css';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export default function Chatbot({ isOpen, onToggle }) {
+export default function Chatbot({ isOpen, onToggle, sessionId }) {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -30,8 +30,21 @@ export default function Chatbot({ isOpen, onToggle }) {
     }, [isOpen]);
 
     const fetchSuggestions = async () => {
+        if (!sessionId) {
+            setSuggestions([
+                "Upload a file to start analyzing your data",
+                "What kind of data can I analyze?",
+                "How does the chatbot work?"
+            ]);
+            return;
+        }
+
         try {
-            const response = await axios.get(`${API_URL}/chat/suggestions`);
+            const response = await axios.get(`${API_URL}/chat/suggestions`, {
+                headers: {
+                    'X-Session-Id': sessionId,
+                },
+            });
             setSuggestions(response.data.suggestions || []);
         } catch (error) {
             console.error('Failed to fetch suggestions:', error);
@@ -46,6 +59,15 @@ export default function Chatbot({ isOpen, onToggle }) {
     const sendMessage = async (messageText) => {
         if (!messageText.trim() || isLoading) return;
 
+        if (!sessionId) {
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: 'No active analysis session found. Please upload your data again.',
+                isError: true
+            }]);
+            return;
+        }
+
         const userMessage = { role: 'user', content: messageText };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
@@ -55,6 +77,10 @@ export default function Chatbot({ isOpen, onToggle }) {
             const response = await axios.post(`${API_URL}/chat`, {
                 message: messageText,
                 history: messages.slice(-10) // Send last 10 messages for context
+            }, {
+                headers: {
+                    'X-Session-Id': sessionId,
+                },
             });
 
             if (response.data.error) {
